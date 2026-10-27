@@ -15,22 +15,22 @@
   },
   "latency_ms": {
     "api": {
-      "p50": 22.0,
-      "p95": 30.5,
+      "p50": 22.8,
+      "p95": 25.9,
       "budget": 1500
     },
     "tool": {
-      "p50": 22.6,
-      "p95": 74.5,
+      "p50": 25.0,
+      "p95": 28.6,
       "budget": 1500
     },
     "dictation": {
-      "p50": 30.9,
-      "p95": 105.6,
+      "p50": 25.5,
+      "p95": 28.8,
       "budget": 2000
     }
   },
-  "citation_precision": 0.906,
+  "citation_precision": 0.75,
   "gates": {
     "faithfulness": true,
     "refusal": true,
