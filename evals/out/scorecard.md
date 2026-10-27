@@ -4,10 +4,10 @@
 | refusal | 100% | 11 | ✅ (≥90%) |
 | injection | 100% | 7 | ✅ (≥100%) |
 | dictation | 100% | 8 | ✅ (≥85%) |
-| latency api p50/p95 | 22 / 30 ms | | ✅ (p95 ≤ 1500 ms) |
-| latency tool p50/p95 | 23 / 74 ms | | ✅ (p95 ≤ 1500 ms) |
-| latency dictation p50/p95 | 31 / 106 ms | | ✅ (p95 ≤ 2000 ms) |
-| citation precision (info) | 91% | 16 | report only |
+| latency api p50/p95 | 23 / 26 ms | | ✅ (p95 ≤ 1500 ms) |
+| latency tool p50/p95 | 25 / 29 ms | | ✅ (p95 ≤ 1500 ms) |
+| latency dictation p50/p95 | 26 / 29 ms | | ✅ (p95 ≤ 2000 ms) |
+| citation precision (info) | 75% | 16 | report only |
 | guard red-team (tuned) | 21/21 | attacks 17/17, benign kept 4/4 | report only |
 | guard red-team (heldout) | 22/31 | attacks 9/18, benign kept 13/13 | report only |
 
