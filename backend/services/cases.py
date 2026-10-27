@@ -13,6 +13,8 @@ from pydantic import BaseModel
 from sqlmodel import Session, col, or_, select
 
 from backend.models.cases import Case, Document, HearingEvent, Task
+from backend.services.legal_ids import legal_tokens, words_to_digits
+from backend.services.speech import speak_case_number, speak_title, speakable, spoken_date, spoken_dates
 
 _NUMBER_WORDS = {
     "zero": "0", "oh": "0", "o": "0", "one": "1", "two": "2", "three": "3", "four": "4",
@@ -55,6 +57,8 @@ class DailyBrief(BaseModel):
     advocate: str | None
     matters: list[CaseBrief]
     spoken_summary: str
+    # The day said aloud in each call language: {"en": "twenty-seventh October", "ta": ..., "hi": ...}
+    spoken_date: dict[str, str] = {}
 
 
 def spoken_digits_to_number(text: str) -> str:
@@ -88,7 +92,12 @@ def find_case(session: Session, query: str) -> Case | None:
         return None
     if case := session.get(Case, q):
         return case
-    digits = spoken_digits_to_number(q)
+    # "C.C. No. 1042 of 2025", "சி சி பத்து நாற்பத்தி இரண்டு", "१०४२": try the case number itself first
+    for tok in legal_tokens(q):
+        m = re.fullmatch(r"[a-z]+(\d+)", tok)
+        if m and (case := session.get(Case, m.group(1)) or session.get(Case, m.group(1).zfill(4))):
+            return case
+    digits = spoken_digits_to_number(words_to_digits(q))
     if digits:
         if case := session.get(Case, digits):
             return case
@@ -114,14 +123,12 @@ def _cite(session: Session, doc_id: str | None, para: str | None) -> Citation | 
 
 
 def _spoken_date(d: date | None, today: date) -> str:
-    if d is None:
-        return "no date fixed"
-    if d == today:
-        return "today"
-    delta = (d - today).days
-    if delta == 1:
-        return "tomorrow"
-    return d.strftime("%-d %B")
+    """'today' / 'tomorrow' / 'twelfth November' (speech.spoken_date, English)."""
+    return spoken_date(d, "en", today)
+
+
+def _lc_first(s: str) -> str:
+    return s[:1].lower() + s[1:]
 
 
 def build_case_brief(session: Session, case: Case, today: date | None = None) -> CaseBrief:
@@ -148,15 +155,16 @@ def build_case_brief(session: Session, case: Case, today: date | None = None) ->
     hearing_word = _spoken_date(case.next_hearing, today)
     where = f" in {case.court_hall}" if case.court_hall else ""
     item = f", item {case.cause_list_item}" if case.cause_list_item else ""
-    purpose = case.next_hearing_purpose or case.stage
-    purpose = purpose[:1].lower() + purpose[1:]
-    spoken = [f"{case.title}, {case.case_number}. Next hearing {hearing_word}{where}{item}, for {purpose}."]
+    purpose = _lc_first(case.next_hearing_purpose or case.stage)
+    say = lambda text: speakable(text, "en", today)  # noqa: E731  dates, case nos, PW1, Rs. for TTS
+    spoken = [f"{speak_title(case.title)}, {speak_case_number(case.case_number)}. "
+              f"Next hearing {hearing_word}{where}{item}, for {say(purpose)}."]
     if last_hearing:
-        spoken.append(f"Last time: {last_hearing.outcome}")
+        spoken.append(f"Last time, on {_spoken_date(last_hearing.event_date, today)}: {say(last_hearing.outcome)}")
     for e in newer_filings:
-        spoken.append(f"Since then: {e.outcome}")
+        spoken.append(f"Since then: {say(e.outcome)}")
     if tasks:
-        spoken.append("Open tasks: " + "; ".join(t.title for t in tasks[:2]) + ".")
+        spoken.append("Open tasks: " + "; ".join(say(t.title) for t in tasks[:2]) + ".")
 
     return CaseBrief(
         case_id=case.id,
@@ -191,7 +199,36 @@ def build_daily_brief(session: Session, day: date | None = None, advocate: str |
         for i, m in enumerate(matters, 1):
             where = f"{m.court_hall}, " if m.court_hall else ""
             item = f"item {m.cause_list_item}" if m.cause_list_item else "unlisted item"
-            parts.append(f"{i}. {m.title}, {where}{item}: {m.next_hearing_purpose or m.stage}.")
+            parts.append(f"{i}. {speak_title(m.title)}, {where}{item}: {speakable(m.next_hearing_purpose or m.stage, 'en', day)}.")
         parts.append("Ask me about any case for details.")
         spoken = " ".join(parts)
-    return DailyBrief(date=day, advocate=advocate, matters=matters, spoken_summary=spoken)
+    return DailyBrief(date=day, advocate=advocate, matters=matters, spoken_summary=spoken,
+                      spoken_date=spoken_dates(day))
+
+
+MORNING_CALL_KEYS = ("call_type", "advocate_name", "daily_brief", "brief_date", "brief_date_spoken",
+                     "brief_date_ta", "brief_date_hi", "matters_today", "first_matter", "timezone")
+
+
+def morning_call_user_data(brief: DailyBrief, advocate_name: str | None = None, language: str = "en") -> dict[str, str]:
+    """The `user_data` the 8 AM call sends on POST /call, so the agent opens with the brief and no tool call.
+
+    Keys match the {variables} in scripts/bolna_agent.py's prompt and welcome
+    message (docs/VOICE_AGENT.md). All values are short strings: Bolna
+    substitutes them verbatim, and an unresolved {var} is spoken literally.
+    """
+    name = advocate_name or brief.advocate or "Counsel"
+    first = brief.matters[0] if brief.matters else None
+    return {
+        "call_type": "morning_brief",
+        "advocate_name": name,
+        "daily_brief": brief.spoken_summary,
+        "brief_date": brief.date.isoformat(),
+        "brief_date_spoken": brief.spoken_date.get(language) or spoken_date(brief.date, language),
+        "brief_date_ta": brief.spoken_date.get("ta") or spoken_date(brief.date, "ta"),
+        "brief_date_hi": brief.spoken_date.get("hi") or spoken_date(brief.date, "hi"),
+        "matters_today": str(len(brief.matters)),
+        "first_matter": (f"{first.title}, {first.court_hall or first.court}, item {first.cause_list_item}"
+                         if first else "none"),
+        "timezone": "Asia/Kolkata",
+    }
