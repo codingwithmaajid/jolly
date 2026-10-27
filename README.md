@@ -133,6 +133,12 @@ Jolly will handle sensitive legal information, so the planned architecture requi
 
 Secrets such as `BOLNA_API_KEY`, LLM keys, database URLs, and Supabase credentials must never be committed to Git or exposed to frontend JavaScript.
 
+### Trust layer (built)
+
+Signed single-use approval links, fail-closed shared secrets, per-advocate case scoping, a multilingual guard (English, Hinglish, Hindi, Tamil) with an output check for PII and invented citations, a hash-chained audit log (`GET /audit`, `GET /audit/verify`) and call-quality stats from Bolna webhooks (`GET /calls/quality`). Details, eval numbers and the honest held-out red-team score: [docs/TRUST.md](docs/TRUST.md).
+
+Evals run offline on every PR with no API keys: `uv run python evals/run_evals.py` (scorecard in `evals/out/scorecard.md`); red-team: `uv run python scripts/redteam.py [--live URL]`.
+
 ## Roadmap
 
 P0 MVP critical:
