@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Jolly SQLite backup nightly at 03:00 IST
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
