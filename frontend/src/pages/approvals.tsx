@@ -171,14 +171,14 @@ function DraftCard({ update, onDone }: { update: HearingUpdate; onDone: () => vo
     try {
       if (kind === "approve") {
         const res = await api.approveUpdate(
-          update.id,
+          update,
           edited
             ? { outcome, next_date: nextDate || null, next_purpose: nextPurpose || null, tasks: tasks.filter((t) => t.title.trim()), client_message: message }
             : undefined,
         );
         if (res.send_link) window.open(res.send_link, "_blank", "noopener");
       } else {
-        await api.rejectUpdate(update.id);
+        await api.rejectUpdate(update);
       }
       onDone();
     } catch (err) {
