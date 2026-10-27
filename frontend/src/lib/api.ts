@@ -19,6 +19,10 @@ import type {
   UploadResult,
 } from "./types";
 
+function approvalHeaders(update: Pick<HearingUpdate, "approval_token">): Record<string, string> {
+  return update.approval_token ? { "X-Approval-Token": update.approval_token } : {};
+}
+
 export const API_URL: string = (
   (import.meta.env.VITE_API_URL as string | undefined) || "http://localhost:8000"
 ).replace(/\/+$/, "");
@@ -113,8 +117,13 @@ export const api = {
     }),
   updates: (status?: UpdateStatus) => request<HearingUpdate[]>(`/updates${status ? `?status=${status}` : ""}`),
   caseUpdates: (id: string) => request<HearingUpdate[]>(`/cases/${enc(id)}/updates`),
-  approveUpdate: (updateId: number, edits?: UpdateEdits) =>
-    request<HearingUpdate>(`/updates/${updateId}/approve`, edits ? post(edits) : { method: "POST" }),
-  rejectUpdate: (updateId: number) => request<HearingUpdate>(`/updates/${updateId}/reject`, { method: "POST" }),
+  /** Approve/reject need the signed, single-use token the backend puts on each pending update. */
+  approveUpdate: (update: Pick<HearingUpdate, "id" | "approval_token">, edits?: UpdateEdits) =>
+    request<HearingUpdate>(`/updates/${update.id}/approve`, {
+      ...(edits ? post(edits) : { method: "POST" }),
+      headers: approvalHeaders(update),
+    }),
+  rejectUpdate: (update: Pick<HearingUpdate, "id" | "approval_token">) =>
+    request<HearingUpdate>(`/updates/${update.id}/reject`, { method: "POST", headers: approvalHeaders(update) }),
   updateMetrics: () => request<UpdateMetrics>("/updates/metrics"),
 };

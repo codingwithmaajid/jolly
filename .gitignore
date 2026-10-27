@@ -18,3 +18,5 @@ frontend/.vite
 jolly.db
 *.db-journal
 site-dist/
+evals/out/results.jsonl
+evals/out/redteam.json

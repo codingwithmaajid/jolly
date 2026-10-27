@@ -23,7 +23,19 @@ class BolnaExecutionEvent(BaseModel):
     context_details: dict[str, Any] | None = None
 
 
-class CaseLookupRequest(BaseModel):
+class CallerContext(BaseModel):
+    """Optional caller context a tool call may carry (from Bolna context variables).
+
+    advocate: the advocate this call is for; when given, cases of other advocates
+    are treated as not found. caller_phone is only ever stored HMAC'd.
+    """
+
+    advocate: str | None = None
+    caller_phone: str | None = None
+    execution_id: str | None = None
+
+
+class CaseLookupRequest(CallerContext):
     """Arguments the Bolna agent passes to the `get_case_brief` custom function."""
 
     case_id: str
@@ -36,14 +48,14 @@ class CaseLookupResponse(BaseModel):
     citations: list[dict[str, Any]] = []
 
 
-class DailyBriefRequest(BaseModel):
+class DailyBriefRequest(CallerContext):
     """Arguments for the `get_daily_brief` custom function (all optional)."""
 
     date: dt.date | None = None
     advocate: str | None = None
 
 
-class CaseQuestionRequest(BaseModel):
+class CaseQuestionRequest(CallerContext):
     """Arguments for the `ask_case_question` custom function."""
 
     case_id: str
@@ -57,14 +69,14 @@ class CaseQuestionResponse(BaseModel):
     answerable: bool = False
     mode: str = "not_found"
     citations: list[dict[str, Any]] = []
+    guard_rule: str | None = None
 
 
-class HearingUpdateRequest(BaseModel):
+class HearingUpdateRequest(CallerContext):
     """Arguments for the `log_hearing_update` custom function."""
 
     case_id: str
     dictation: str
-    execution_id: str | None = None
 
 
 class HearingUpdateResponse(BaseModel):
