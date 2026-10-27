@@ -1,0 +1,23 @@
+{
+  "app": "python3 app.py",
+  "watch": {
+    "include": ["**"],
+    "exclude": ["README.md", "cdk*.json", "**/__pycache__", "cdk.out", "ecs-express"]
+  },
+  "context": {
+    "domain": "api.golnk.in",
+    "image": "ghcr.io/codingwithmaajid/jolly-backend",
+    "githubRepo": "codingwithmaajid/jolly",
+    "githubDeployRefs": ["ref:refs/heads/main"],
+    "githubOidcProviderArn": "",
+    "alertEmail": "abdulmaajid7002@gmail.com",
+    "budgetUsd": 10,
+    "instanceType": "t4g.small",
+    "corsOrigins": "https://golnk.in,https://jolly.golnk.in",
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:target-partitions": ["aws"],
+    "@aws-cdk/aws-ec2:restrictDefaultSecurityGroup": true,
+    "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": true
+  }
+}
