@@ -192,6 +192,10 @@ export interface HearingUpdate {
   status: UpdateStatus;
   created_at: string;
   decided_at: string | null;
+  /** Signed, expiring, single-use approval token (pending drafts only). */
+  approval_token?: string | null;
+  approve_url?: string | null;
+  reject_url?: string | null;
 }
 
 export interface UpdateEdits {

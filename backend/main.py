@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from backend.api.audit import router as audit_router
 from backend.api.bolna import router as bolna_router
 from backend.api.calls import router as calls_router
 from backend.api.cases import router as cases_router
@@ -86,6 +87,7 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(bolna_router)
     app.include_router(cases_router)
     app.include_router(updates_router)
+    app.include_router(audit_router)
 
 
 def register_exception_handlers(app: FastAPI, settings: Settings) -> None:

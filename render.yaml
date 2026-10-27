@@ -35,6 +35,11 @@ services:
         sync: false
       - key: BOLNA_WEBHOOK_SECRET
         sync: false
+      # Trust layer (optional; both fall back to BOLNA_WEBHOOK_SECRET)
+      - key: APPROVAL_SECRET
+        sync: false
+      - key: AUDIT_PEPPER
+        sync: false
 
   # Jolly console (frontend/). Static site, free on Render.
   - type: web

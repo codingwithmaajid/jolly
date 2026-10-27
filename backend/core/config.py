@@ -35,6 +35,8 @@ class Settings:
     llm_model: str = "gemini-3.8-flash"
     llm_fallback_models: tuple[str, ...] = ()
     embedding_model: str = "gemini-embedding-2"
+    # Output size for Gemini embeddings (768 fits a pgvector vector(768) column).
+    embedding_dim: int = 768
     storage_bucket: Optional[str] = None
     vector_database_url: Optional[str] = None
     # Bolna voice layer (https://www.bolna.ai/docs/api-reference/introduction)
@@ -49,6 +51,13 @@ class Settings:
     call_allowed_numbers: tuple[str, ...] = ()
     # Load the synthetic demo matters into an empty database on startup.
     seed_demo_data: bool = True
+    # Trust layer. HMAC key for signed approval links (falls back to
+    # BOLNA_WEBHOOK_SECRET); token lifetime; pepper for hashing phone numbers
+    # in the audit log (falls back to the approval key).
+    approval_secret: Optional[str] = None
+    approval_ttl_seconds: int = 86400
+    approval_token_in_payload: bool = True
+    audit_pepper: Optional[str] = None
 
 
 def get_settings() -> Settings:
@@ -68,6 +77,7 @@ def get_settings() -> Settings:
         llm_model=_get_env("LLM_MODEL", "gemini-3.8-flash"),
         llm_fallback_models=tuple(_parse_csv(_get_env("LLM_FALLBACK_MODELS", "gemini-flash-lite-latest,gemini-2.5-flash-lite,gemini-flash-latest,gemini-2.5-flash"))),
         embedding_model=_get_env("EMBEDDING_MODEL", "gemini-embedding-2"),
+        embedding_dim=int(_get_env("EMBEDDING_DIM", "768")),
         storage_bucket=_get_optional_env("STORAGE_BUCKET"),
         vector_database_url=_get_optional_env("VECTOR_DATABASE_URL"),
         bolna_api_key=_get_optional_env("BOLNA_API_KEY"),
@@ -77,4 +87,8 @@ def get_settings() -> Settings:
         bolna_webhook_secret=_get_optional_env("BOLNA_WEBHOOK_SECRET"),
         call_allowed_numbers=tuple(_parse_csv(_get_env("CALL_ALLOWED_NUMBERS", ""))),
         seed_demo_data=_get_env("SEED_DEMO_DATA", "true").lower() in ("1", "true", "yes"),
+        approval_secret=_get_optional_env("APPROVAL_SECRET"),
+        approval_ttl_seconds=int(_get_env("APPROVAL_TTL_SECONDS", "86400")),
+        approval_token_in_payload=_get_env("APPROVAL_TOKEN_IN_PAYLOAD", "true").lower() in ("1", "true", "yes"),
+        audit_pepper=_get_optional_env("AUDIT_PEPPER"),
     )

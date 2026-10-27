@@ -1,0 +1,93 @@
+# Manually redeploy the Jolly box in AWS Mumbai.
+# GitHub assumes an AWS role over OIDC (no stored AWS keys) and runs
+# /opt/jolly/deploy.sh on the instance through SSM Run Command.
+#
+# Setup (Settings -> Secrets and variables -> Actions -> Variables):
+#   AWS_ROLE_ARN   = DeployRoleArn output of `cdk deploy`   (unset = this workflow does nothing)
+#   JOLLY_API_URL  = https://api.golnk.in                    (optional, for the smoke test)
+# The role only trusts runs from the refs listed in infra/aws/cdk.json (main by default).
+name: Deploy to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag in ghcr.io/codingwithmaajid/jolly-backend (e.g. latest, sha-1a2b3c4)"
+        required: true
+        default: latest
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+
+jobs:
+  skipped:
+    if: vars.AWS_ROLE_ARN == ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "::notice::AWS_ROLE_ARN is not set, so there is nothing to deploy. See docs/DEPLOY_AWS.md."
+
+  deploy:
+    if: vars.AWS_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate tag
+        env:
+          TAG: ${{ inputs.image_tag }}
+        run: |
+          [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::bad image tag '$TAG'"; exit 1; }
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: jolly-deploy-${{ github.run_id }}
+
+      - name: Find the instance
+        id: box
+        run: |
+          ID=$(aws ec2 describe-instances \
+                --filters Name=tag:app,Values=jolly Name=instance-state-name,Values=running \
+                --query 'Reservations[].Instances[].InstanceId' --output text)
+          [ -n "$ID" ] || { echo "::error::no running instance tagged app=jolly"; exit 1; }
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Pull and restart via SSM
+        env:
+          TAG: ${{ inputs.image_tag }}
+          ID: ${{ steps.box.outputs.id }}
+        run: |
+          CID=$(aws ssm send-command --instance-ids "$ID" --document-name AWS-RunShellScript \
+                --comment "jolly deploy $TAG (run ${{ github.run_id }})" \
+                --parameters "commands=[\"/opt/jolly/deploy.sh $TAG\"],executionTimeout=[\"600\"]" \
+                --query Command.CommandId --output text)
+          echo "command $CID"
+          for i in $(seq 1 80); do
+            STATUS=$(aws ssm get-command-invocation --command-id "$CID" --instance-id "$ID" \
+                      --query Status --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in Pending|InProgress|Delayed) sleep 8 ;; *) break ;; esac
+          done
+          aws ssm get-command-invocation --command-id "$CID" --instance-id "$ID" \
+            --query '[StandardOutputContent,StandardErrorContent]' --output text || true
+          echo "status: $STATUS"
+          [ "$STATUS" = "Success" ]
+
+      - name: Record the tag (a later plain deploy.sh run uses it)
+        env:
+          TAG: ${{ inputs.image_tag }}
+        run: aws ssm put-parameter --name /jolly/image-tag --type String --overwrite --value "$TAG" >/dev/null
+
+      - name: Smoke test
+        env:
+          URL: ${{ vars.JOLLY_API_URL || 'https://api.golnk.in' }}
+        run: |
+          for i in 1 2 3 4 5 6; do curl -fsS -m 15 "$URL/health" && exit 0 || sleep 10; done
+          echo "::error::$URL/health did not answer"; exit 1

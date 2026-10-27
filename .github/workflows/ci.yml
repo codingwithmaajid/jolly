@@ -1,0 +1,55 @@
+# CI on every PR: backend tests, the offline trust evals (no API keys) and the console build.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: pytest + evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --dev
+      - name: Tests
+        run: uv run pytest -q
+      - name: Offline evals (gated; fails the job if a gate fails)
+        run: uv run python evals/run_evals.py --out evals/out
+      - name: Scorecard to job summary
+        if: always()
+        run: cat evals/out/scorecard.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Red-team (report only)
+        if: always()
+        run: uv run python scripts/redteam.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: evals/out
+
+  frontend:
+    name: console build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
