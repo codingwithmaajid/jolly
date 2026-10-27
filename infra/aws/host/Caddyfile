@@ -1,0 +1,9 @@
+# Caddy gets a Let's Encrypt cert for $DOMAIN (HTTP-01 on :80) and proxies to the API.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8000
+	log {
+		output stdout
+		format console
+	}
+}
