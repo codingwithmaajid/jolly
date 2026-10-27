@@ -35,6 +35,8 @@ class Settings:
     llm_model: str = "gemini-3.8-flash"
     llm_fallback_models: tuple[str, ...] = ()
     embedding_model: str = "gemini-embedding-2"
+    # Output size for Gemini embeddings (768 fits a pgvector vector(768) column).
+    embedding_dim: int = 768
     storage_bucket: Optional[str] = None
     vector_database_url: Optional[str] = None
     # Bolna voice layer (https://www.bolna.ai/docs/api-reference/introduction)
@@ -75,6 +77,7 @@ def get_settings() -> Settings:
         llm_model=_get_env("LLM_MODEL", "gemini-3.8-flash"),
         llm_fallback_models=tuple(_parse_csv(_get_env("LLM_FALLBACK_MODELS", "gemini-flash-lite-latest,gemini-2.5-flash-lite,gemini-flash-latest,gemini-2.5-flash"))),
         embedding_model=_get_env("EMBEDDING_MODEL", "gemini-embedding-2"),
+        embedding_dim=int(_get_env("EMBEDDING_DIM", "768")),
         storage_bucket=_get_optional_env("STORAGE_BUCKET"),
         vector_database_url=_get_optional_env("VECTOR_DATABASE_URL"),
         bolna_api_key=_get_optional_env("BOLNA_API_KEY"),
