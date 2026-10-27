@@ -14,7 +14,7 @@ from sqlmodel import Session
 from backend.api.audit import AuditedRoute
 from backend.core.db import get_session
 from backend.core.security import hash_identifier, require_secret
-from backend.services.cases import build_daily_brief
+from backend.services.cases import build_daily_brief, morning_call_user_data
 
 from backend.models.calls import CallRequest, CallResponse, CallStatusResponse
 from backend.services.bolna_client import TERMINAL_STATUSES, BolnaClient
@@ -92,6 +92,7 @@ def morning_call(
     request: Request,
     phone_number: str = Query(..., description="Advocate's phone, E.164"),
     advocate: str | None = None,
+    language: str = Query(default="en", pattern="^(en|ta|hi)$"),
     x_bolna_secret: str | None = Header(default=None),
     x_jolly_secret: str | None = Header(default=None),
     secret: str | None = Query(default=None),
@@ -108,7 +109,7 @@ def morning_call(
     brief = build_daily_brief(session, day=date.today(), advocate=advocate)
     data = _get_client(request).place_call(
         phone,
-        user_data={"call_type": "morning_brief", "date": brief.date.isoformat(), "matters_today": str(len(brief.matters))},
+        user_data=morning_call_user_data(brief, advocate, language),
     )
     return MorningCallResponse(
         status=str(data.get("status", "queued")),
