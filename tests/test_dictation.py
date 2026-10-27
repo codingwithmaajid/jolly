@@ -46,7 +46,8 @@ def test_dictation_creates_pending_draft_without_touching_case(client: TestClien
 def test_approve_commits_to_record(client: TestClient) -> None:
     d = client.post("/cases/1042/dictations", json={"text": NOTE, "hearing_date": "2026-10-21"}).json()
     tasks_before = len(client.get("/cases/1042/tasks").json())
-    r = client.post(f"/updates/{d['id']}/approve")
+    assert client.post(f"/updates/{d['id']}/approve").status_code == 401  # no signed token
+    r = client.post(f"/updates/{d['id']}/approve", headers={"X-Approval-Token": d["approval_token"]})
     assert r.status_code == 200
     a = r.json()
     assert a["status"] == "approved"
@@ -55,14 +56,14 @@ def test_approve_commits_to_record(client: TestClient) -> None:
     assert case["next_hearing"] == "2026-11-14"
     assert client.get("/cases/1042/timeline").json()[-1]["kind"] == "dictation"
     assert len(client.get("/cases/1042/tasks").json()) == tasks_before + 2
-    assert client.post(f"/updates/{d['id']}/approve").status_code == 409
+    assert client.post(f"/updates/{d['id']}/approve", headers={"X-Approval-Token": d["approval_token"]}).status_code == 409
     m = client.get("/updates/metrics").json()
     assert m["approved"] == 1 and m["approved_unedited"] == 1
 
 
 def test_approve_with_edits_counts_as_edited(client: TestClient) -> None:
     d = client.post("/cases/2217/dictations", json={"text": NOTE, "hearing_date": "2026-10-21"}).json()
-    r = client.post(f"/updates/{d['id']}/approve", json={"next_date": "2026-11-20", "tasks": []})
+    r = client.post(d["approve_url"], json={"next_date": "2026-11-20", "tasks": []})
     assert r.json()["next_date"] == "2026-11-20"
     assert client.get("/cases/2217").json()["next_hearing"] == "2026-11-20"
     assert client.get("/updates/metrics").json()["approved_unedited"] == 0
@@ -71,7 +72,7 @@ def test_approve_with_edits_counts_as_edited(client: TestClient) -> None:
 def test_reject_leaves_record_alone(client: TestClient) -> None:
     before = client.get("/cases/0789").json()["next_hearing"]
     d = client.post("/cases/0789/dictations", json={"text": NOTE, "hearing_date": "2026-10-21"}).json()
-    assert client.post(f"/updates/{d['id']}/reject").json()["status"] == "rejected"
+    assert client.post(d["reject_url"]).json()["status"] == "rejected"
     assert client.get("/cases/0789").json()["next_hearing"] == before
 
 
