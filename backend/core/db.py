@@ -12,6 +12,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 import backend.models.cases  # noqa: F401  (register tables)
 import backend.models.retrieval  # noqa: F401
+import backend.models.trust  # noqa: F401
 
 DEFAULT_DATABASE_URL = "sqlite:///./jolly.db"
 
